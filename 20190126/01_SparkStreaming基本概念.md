@@ -94,7 +94,11 @@
 # 三、滑动时间间隔
 
 ```
+1、滑动时间间隔决定了Spark Streaming对数据进行统计与分析的频率，多出现在与窗口相关的操作中。
 
+2、滑动时间间隔是基于批处理时间间隔提出的，其必须是批处理时间间隔的整数倍。在默认的情况下滑动时间间隔设置为与批处理时间间隔相同的值。
+
+3、如果批处理时间间隔为1s，窗口间隔为3s，滑动时间间隔为2s，其含义是每隔2s对过去3s内产生的3个RDD进行统计分析。
 ```
 
 # 四、DStream的基本概念
@@ -106,8 +110,6 @@
 
 3、Spark Streaming每次将新产生的RDD添加到哈希表中，而对于已经不再需要的RDD则会从这个哈希表中删除，所以DStream也可以简单地理解为以时间为键的RDD的动态序列。设批处理时间间隔为1s，下图为4s内产生的DStream示意图。
 ```
-
-![DStream示意图](assets/1548507952851.png)
 
 # Ⅱ | Spark Streaming编程模式与案例分析
 
@@ -142,11 +144,37 @@ Spark Streaming应用程序在功能结构上通常包含以下五部分
 ## 2、代码实现
 
 ```scala
+import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.streaming.{Milliseconds,Seconds, StreamingContext}
+import org.apache.spark.streaming.StreamingContext._
+object StatefulWordCount {
+  def main(args:Array[String]): Unit ={
+/*定义更新状态方法，参数values为当前批处理时间间隔内各单词出现的次数，state为以往所有批次各单词累计出现次数。*/
+    val updateFunc=(values: Seq[Int],state:Option[Int])=>{
+		val currentCount=values.foldLeft(0)(_+_)
+		val previousCount=state.getOrElse(0)
+		Some(currentCount+previousCount)
+    }
+    val conf=new SparkConf().
+setAppName("StatefulWordCount").
 
-```
-
-```
-
+setMaster("spark://192.168.149.132:7077")
+    val sc=new SparkContext(conf)
+//创建StreamingContext，Spark Steaming运行时间间隔为5秒。
+    val ssc=new StreamingContext(sc, Seconds(5))
+/*使用updateStateByKey时需要checkpoint持久化接收到的数据。在集群模式下运行时，需要将持久化目录设为HDFS上的目录。*/
+	ssc.checkpoint("hdfs://master:9000/user/dong/input/StatefulWordCountlog")
+/*通过Socket获取指定节点指定端口的数据创建DStream，其中节点与端口分别由参数args(0)和args(1)给出。*/
+    val lines=ssc.socketTextStream(args(0),args(1).toInt)
+    val words=lines.flatMap(_.split(","))
+    val wordcounts=words.map(x=>(x,1))
+//使用updateStateByKey来更新状态，统计从运行开始以来单词总的次数。
+    val stateDstream=wordcounts.updateStateByKey[Int](updateFunc)
+    stateDstream.print()
+    ssc.start()
+    ssc.awaitTermination()
+  }
+}
 ```
 
 # 三、window应用案例
