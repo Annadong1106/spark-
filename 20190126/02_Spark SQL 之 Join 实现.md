@@ -94,13 +94,16 @@ Spark支持所有类型的Join，包括：
 ## 3.1、sort merge join实现
 
 ```
-
+如下图所示，整个过程分为三个步骤： 
+1. shuffle阶段：将两张大表根据join key进行重新分区，两张表数据会分布到整个集群，以便分布式并行处理 
+2. sort阶段：对单个分区节点的两表数据，分别进行排序 
+3. merge阶段：对排好序的两张分区表数据执行join操作。join操作很简单，分别遍历两个有序序列，碰到相同join key就merge输出，否则取更小一边 
 ```
 
 ![004](http://hbasefly.com/wp-content/uploads/2017/03/004.png)
 
 ```
-
+在遍历streamIter时，对于每条记录，都采用顺序查找的方式从buildIter查找对应的记录，由于两个表都是排序的，每次处理完streamIter的一条记录后，对于streamIter的下一条记录，只需从buildIter中上一次查找结束的位置开始查找，所以说每次在buildIter中查找不必重头开始，整体上来说，查找性能还是较优的。
 ```
 
 ## 3.2、broadcast join实现
