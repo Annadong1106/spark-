@@ -3,3 +3,6 @@ http://sharkdtu.com/posts/spark-sql-join.html
 
 SparkSQL中的三种Join及其具体实现（broadcast join、shuffle hash join和sort merge join）
 https://blog.csdn.net/wlk_328909605/article/details/82933552
+
+SparkSQL – 有必要坐下来聊聊Join
+http://hbasefly.com/2017/03/19/sparksql-basic-join/
